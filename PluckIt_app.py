@@ -38,17 +38,22 @@ url = st.text_input("Paste URL here:", placeholder="https://www.youtube.com/watc
 
 if url:
     # 1. Define yt-dlp Options to bypass 403 Forbidden
-    ydl_opts = {
+ydl_opts = {
         'format': f'{quality}[ext={file_format}]/best' if file_format == 'mp4' else 'bestaudio/best',
         'outtmpl': f'{DOWNLOAD_DIR}/%(title)s.%(ext)s',
         'noplaylist': True,
-        # Critical headers to mimic a real browser
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'referer': 'https://www.google.com/',
-        'quiet': True,
-        'no_warnings': True,
+        # Enhanced bypass headers
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.google.com/',
+        },
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'quiet': False, # Set to False temporarily to see more errors in logs
+        'no_warnings': False,
     }
-
     # 2. Add Post-Processor for MP3
     if file_format == "mp3":
         ydl_opts['postprocessors'] = [{
@@ -93,3 +98,4 @@ if url:
 # Footer
 st.markdown("---")
 st.caption("Pluck It | Built with Streamlit & yt-dlp")
+
