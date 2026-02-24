@@ -2,26 +2,26 @@ import streamlit as st
 import yt_dlp
 import os
 import re
+import tempfile
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Pluck It Pro", page_icon="📥", layout="wide")
 
-# Custom CSS to make it look professional
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #FF4B4B; color: white; }
+    .main { background-color: #f9f9f9; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #FF0000; color: white; font-weight: bold; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #eee; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("📥 Pluck It Pro")
-st.markdown("---")
+st.caption("Ultimate 2026 Bypass Edition - Powered by PoX & iOS Client Spoofing")
 
 # Helper to calculate estimated savings
 def get_savings(mode, quality_key):
     video_sizes = {"1080p": 120, "720p": 60, "480p": 30, "360p": 15, "240p": 8}
     audio_sizes = {"320 kbps": 2.4, "256 kbps": 1.9, "192 kbps": 1.4, "128 kbps": 1.0, "96 kbps": 0.7, "64 kbps": 0.5}
-    
     if mode == "Video (MP4)":
         saved = video_sizes["1080p"] - video_sizes.get(quality_key, 120)
         return saved, "MB/min"
@@ -34,53 +34,69 @@ v_options = {"1080p": "1080", "720p": "720", "480p": "480", "360p": "360", "240p
 a_options = {"320 kbps": "320", "256 kbps": "256", "192 kbps": "192", "128 kbps": "128", "96 kbps": "96", "64 kbps": "64"}
 
 with st.sidebar:
-    st.header("⚙️ Settings")
-    mode = st.radio("Download Mode", ["Video (MP4)", "Audio (MP3)"])
+    st.header("⚙️ Pluck Settings")
+    mode = st.radio("Output Type", ["Video (MP4)", "Audio (MP3)"])
     if mode == "Video (MP4)":
-        quality_label = st.selectbox("Resolution", list(v_options.keys()), index=1)
+        quality_label = st.selectbox("Max Resolution", list(v_options.keys()), index=1)
         selected_quality = v_options[quality_label]
     else:
-        quality_label = st.selectbox("Bitrate", list(a_options.keys()), index=2)
+        quality_label = st.selectbox("Audio Bitrate", list(a_options.keys()), index=2)
         selected_quality = a_options[quality_label]
     
+    st.markdown("---")
     saved_val, unit = get_savings(mode, quality_label)
     if saved_val > 0:
-        st.metric("Storage Saved", f"{saved_val} {unit}", help="Estimated vs. highest quality option")
-    
-    st.info("💡 Tip: If you get a 403 error, try updating yt-dlp via 'pip install -U yt-dlp'.")
+        st.metric("Efficiency Gain", f"{saved_val} {unit}")
 
 # --- Main Interface ---
-url = st.text_input("Enter URL:", placeholder="https://www.youtube.com/watch?v=...")
+url = st.text_input("YouTube URL:", placeholder="Paste link here...")
 
 if url:
-    with st.expander("📺 Preview Video Snippet", expanded=True):
+    with st.expander("📺 Preview", expanded=False):
         try:
             st.video(url)
         except:
-            st.warning("Preview not available for this link.")
+            st.info("Direct preview not available, but plucking should still work.")
 
-    # 1. Base YDL Options to bypass 403 Forbidden
+    # --- THE ULTIMATE 2026 BYPASS CONFIG ---
     ydl_opts = {
         'outtmpl': 'downloads/%(title)s.%(ext)s',
         'noplaylist': True,
-        # Bypass 403: Use modern headers and mimic different clients
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
-            'Sec-Fetch-Mode': 'navigate',
+        'quiet': True,
+        'no_warnings': True,
+        # 1. Force IPv4 (Streamlit Cloud IPs are often blocked on IPv6)
+        'source_address': '0.0.0.0',
+        # 2. PoX & Client Bypass (iOS and TV clients are the most trusted in 2026)
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'tv'],
+                'player_skip': ['webpage', 'configs'],
+            }
         },
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        # 3. Modern Headers
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        # 4. Disable DASH/HLS manifests which often trigger 403 checks
+        'youtube_include_dash_manifest': False,
+        'youtube_include_hls_manifest': False,
+        'nocheckcertificate': True,
     }
 
-    # 2. Add Cookies (Optional but Recommended)
-    # If cookies.txt exists in your folder, yt-dlp will use it automatically
-    if os.path.exists('cookies.txt'):
+    # --- Cookie Logic (Bypasses blacklisted server IPs) ---
+    if "YT_COOKIES" in st.secrets:
+        # For Deployment: Use Streamlit Secrets
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as tmp:
+            tmp.write(st.secrets["YT_COOKIES"])
+            ydl_opts['cookiefile'] = tmp.name
+    elif os.path.exists('cookies.txt'):
+        # For Local: Use local file
         ydl_opts['cookiefile'] = 'cookies.txt'
 
-    # 3. Format Selection Logic
+    # Format Logic
     if mode == "Video (MP4)":
-        ydl_opts['format'] = f'bestvideo[height<={selected_quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={selected_quality}]'
+        ydl_opts['format'] = f'bestvideo[height<={selected_quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={selected_quality}][ext=mp4]'
     else:
         ydl_opts['format'] = 'bestaudio/best'
         ydl_opts['postprocessors'] = [{
@@ -90,25 +106,22 @@ if url:
         }]
 
     if st.button("🚀 Pluck Now"):
-        # Create downloads folder if not exists
-        if not os.path.exists("downloads"):
-            os.makedirs("downloads")
-
+        if not os.path.exists("downloads"): os.makedirs("downloads")
+        
         progress_bar = st.progress(0)
         status = st.empty()
         
         def hook(d):
             if d['status'] == 'downloading':
-                # Remove % and get numeric value for progress bar
                 p_str = d.get('_percent_str', '0%')
-                p_clean = re.sub(r'\x1b\[[0-9;]*m', '', p_str).replace('%','') # Clean ANSI codes
+                # Clean ANSI color codes from string
+                p_clean = re.sub(r'\x1b\[[0-9;]*m', '', p_str).replace('%','')
                 try:
                     progress_bar.progress(float(p_clean)/100)
-                    status.text(f"Plucking... {p_str}")
-                except:
-                    pass
+                    status.text(f"Status: Plucking {p_str}...")
+                except: pass
             if d['status'] == 'finished':
-                status.text("Processing complete. Ready for download!")
+                status.text("Plucking complete! Finalizing file...")
 
         ydl_opts['progress_hooks'] = [hook]
 
@@ -117,22 +130,22 @@ if url:
                 info = ydl.extract_info(url, download=True)
                 file_path = ydl.prepare_filename(info)
                 
-                # Correction for audio extension after post-processing
+                # Update path if it was converted to MP3
                 if mode == "Audio (MP3)":
                     file_path = os.path.splitext(file_path)[0] + ".mp3"
 
-            # 4. Final Download Button
             with open(file_path, "rb") as f:
                 st.download_button(
-                    label=f"💾 Save {mode} to Device", 
-                    data=f, 
+                    label=f"💾 Download {quality_label} {mode}",
+                    data=f,
                     file_name=os.path.basename(file_path),
                     mime="video/mp4" if mode == "Video (MP4)" else "audio/mpeg"
                 )
             
-            # 5. Clean up server storage
+            # Clean up server file immediately
             os.remove(file_path)
+            st.success("Plucked successfully!")
             
         except Exception as e:
-            st.error(f"Error: {e}")
-            st.info("If the error persists, YouTube might be blocking this IP. Try running the app locally with a 'cookies.txt' file.")
+            st.error(f"Plucking Failed: {e}")
+            st.info("Note: If you are on Streamlit Cloud, you MUST use 'cookies.txt' because YouTube blocks Cloud IPs.")
