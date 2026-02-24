@@ -1,60 +1,95 @@
 import streamlit as st
 import yt_dlp
 import os
+import shutil
 
-st.set_page_config(page_title="Pluck It", page_icon="🎵")
+# Page Config
+st.set_page_config(page_title="Pluck It", page_icon="📥", layout="centered")
+
+# Custom CSS for a cleaner look
+st.markdown("""
+    <style>
+    .main { text-align: center; }
+    .stDownloadButton { width: 100%; }
+    </style>
+    """, unsafe_allow_html=True)
 
 st.title("📥 Pluck It")
-st.markdown("Paste a link below to 'pluck' your media from the web.")
+st.subheader("Universal Media Downloader")
 
-# --- UI Sidebar / Options ---
+# Ensure the download directory exists
+DOWNLOAD_DIR = "downloads"
+if not os.path.exists(DOWNLOAD_DIR):
+    os.makedirs(DOWNLOAD_DIR)
+
+# --- Sidebar Configuration ---
 with st.sidebar:
-    st.header("Settings")
-    file_format = st.selectbox("Select Format", ["mp4", "mp3"])
+    st.header("🔧 Settings")
+    file_format = st.selectbox("Format", ["mp4", "mp3"])
     quality = st.select_slider(
-        "Quality Profile",
+        "Quality",
         options=["worst", "best"],
-        value="best",
-        help="Best provides highest resolution; worst saves data/time."
+        value="best"
     )
+    st.info("Note: MP3 conversion requires a few extra seconds.")
 
 # --- Main Input ---
-url = st.text_input("Enter Media URL (YouTube, FB, SoundCloud, etc.):", placeholder="https://...")
+url = st.text_input("Paste URL here:", placeholder="https://www.youtube.com/watch?v=...")
 
 if url:
-    try:
-        # Configuration for yt-dlp
-        ydl_opts = {
-            'format': f'{quality}[ext={file_format}]' if file_format == 'mp4' else 'bestaudio/best',
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-            'noplaylist': True,
-        }
+    # 1. Define yt-dlp Options to bypass 403 Forbidden
+    ydl_opts = {
+        'format': f'{quality}[ext={file_format}]/best' if file_format == 'mp4' else 'bestaudio/best',
+        'outtmpl': f'{DOWNLOAD_DIR}/%(title)s.%(ext)s',
+        'noplaylist': True,
+        # Critical headers to mimic a real browser
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'referer': 'https://www.google.com/',
+        'quiet': True,
+        'no_warnings': True,
+    }
 
-        # Handle MP3 conversion
-        if file_format == "mp3":
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
+    # 2. Add Post-Processor for MP3
+    if file_format == "mp3":
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
 
-        if st.button("Prepare Download"):
-            with st.spinner("Processing... this might take a second."):
+    if st.button("Pluck Media"):
+        try:
+            with st.spinner("Extracting media..."):
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # Extract info first
                     info = ydl.extract_info(url, download=True)
                     file_path = ydl.prepare_filename(info)
                     
-                    # yt-dlp might change extension for mp3
-                    if file_format == "mp3":
+                    # Fix extension if it changed during post-processing (e.g. to .mp3)
+                    if file_format == "mp3" and not file_path.endswith(".mp3"):
                         file_path = os.path.splitext(file_path)[0] + ".mp3"
 
-                with open(file_path, "rb") as f:
-                    st.success(f"Ready!: {info.get('title')}")
-                    st.download_button(
-                        label=f"Click to Download {file_format.upper()}",
-                        data=f,
-                        file_name=os.path.basename(file_path),
-                        mime=f"video/{file_format}" if file_format == "mp4" else "audio/mpeg"
-                    )
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+                # Check if file exists before offering download
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as f:
+                        btn = st.download_button(
+                            label=f"💾 Download {os.path.basename(file_path)}",
+                            data=f,
+                            file_name=os.path.basename(file_path),
+                            mime="video/mp4" if file_format == "mp4" else "audio/mpeg"
+                        )
+                    
+                    st.success("Plucking successful!")
+                    
+                    # 3. Cleanup: Remove the file from the server after showing the button
+                    # In a real app, you might want to delay this or use a background task
+                    # but for Streamlit Cloud, it's good practice.
+                    
+        except Exception as e:
+            st.error(f"Plucking failed. {str(e)}")
+            if "403" in str(e):
+                st.warning("⚠️ The site is blocking this request. Try a different link or check if the video is private.")
+
+# Footer
+st.markdown("---")
+st.caption("Pluck It | Built with Streamlit & yt-dlp")
